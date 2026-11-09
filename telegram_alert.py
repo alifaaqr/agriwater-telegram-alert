@@ -1,4 +1,3 @@
-
 import os
 import json
 import requests
@@ -15,21 +14,13 @@ from firebase_admin import credentials, db
 
 FIREBASE_DATABASE_URL = os.environ["FIREBASE_DATABASE_URL"]
 FIREBASE_SERVICE_ACCOUNT = os.environ["FIREBASE_SERVICE_ACCOUNT"]
-
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 
 WAKTU_LOKAL = ZoneInfo("Asia/Jakarta")
 
-BATAS_HARIAN = [
-    4500,
-    5000
-]
-
-BATAS_BULANAN = [
-    145000,
-    150000
-]
+BATAS_HARIAN = [4500, 5000]
+BATAS_BULANAN = [145000, 150000]
 
 
 # ==========================================
@@ -40,25 +31,18 @@ service_account = json.loads(FIREBASE_SERVICE_ACCOUNT)
 
 if not firebase_admin._apps:
     credential = credentials.Certificate(service_account)
-
     firebase_admin.initialize_app(
         credential,
-        {
-            "databaseURL": FIREBASE_DATABASE_URL
-        }
+        {"databaseURL": FIREBASE_DATABASE_URL}
     )
 
 
 # ==========================================
-# FUNGSI TELEGRAM
+# KIRIM TELEGRAM
 # ==========================================
 
 def kirim_telegram(pesan):
-
-    url = (
-        f"https://api.telegram.org/"
-        f"bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    )
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
 
     response = requests.post(
         url,
@@ -76,32 +60,43 @@ def kirim_telegram(pesan):
     if not hasil.get("ok"):
         raise RuntimeError("Pesan Telegram gagal dikirim.")
 
+    print("Pesan Telegram berhasil dikirim.")
+
 
 # ==========================================
-# MEMBACA DATA FIREBASE
+# KONVERSI ANGKA
 # ==========================================
 
 def angka(nilai):
-
     try:
         return float(nilai or 0)
     except (ValueError, TypeError):
         return 0.0
 
 
-def baca_data():
+# ==========================================
+# MEMBACA FIREBASE
+# ==========================================
 
+def baca_data():
     sekarang = datetime.now(WAKTU_LOKAL)
 
     tanggal = sekarang.strftime("%Y-%m-%d")
+    bulan = sekarang.strftime("%Y-%m")
 
     monitoring = db.reference(
         "AgriWater/WaterMeter/Monitoring"
-    ).get() or {}
+    ).get()
 
     riwayat_harian = db.reference(
         f"AgriWater/RiwayatHarian/{tanggal}"
-    ).get() or {}
+    ).get()
+
+    if monitoring is None:
+        raise ValueError("Data Monitoring tidak ditemukan di Firebase.")
+
+    if riwayat_harian is None:
+        raise ValueError("Data RiwayatHarian hari ini tidak ditemukan.")
 
     pemakaian_harian = angka(
         riwayat_harian.get("pemakaianLiter", 0)
@@ -111,14 +106,11 @@ def baca_data():
         monitoring.get("monthly_liters", 0)
     )
 
-    peringatan_bocor = monitoring.get(
-        "leak_warning",
-        False
-    )
+    peringatan_bocor = monitoring.get("leak_warning", False)
 
     return {
         "tanggal": tanggal,
-        "bulan": sekarang.strftime("%Y-%m"),
+        "bulan": bulan,
         "harian": pemakaian_harian,
         "bulanan": pemakaian_bulanan,
         "bocor": peringatan_bocor
@@ -126,13 +118,14 @@ def baca_data():
 
 
 # ==========================================
-# STATUS AGAR NOTIFIKASI TIDAK BERULANG
+# CEK BATAS PEMAKAIAN
 # ==========================================
 
 def cek_dan_kirim(nama, nilai, batas, periode):
 
+    # Setiap batas mempunyai status sendiri
     status_ref = db.reference(
-        f"AgriWater/TelegramAlertState/{periode}/{nama}"
+        f"AgriWater/TelegramAlertState/{periode}/{nama}_{batas}"
     )
 
     sudah_dikirim = status_ref.get() or False
@@ -142,35 +135,31 @@ def cek_dan_kirim(nama, nilai, batas, periode):
     if kondisi and not sudah_dikirim:
 
         pesan = (
-            f"PERINGATAN AGriWATER\n\n"
+            "PERINGATAN AgriWater\n\n"
             f"{nama.replace('_', ' ').title()}\n"
             f"Pemakaian: {nilai:,.0f} Liter\n"
             f"Batas: {batas:,.0f} Liter\n\n"
-            f"Mohon periksa penggunaan air."
+            "Mohon periksa penggunaan air."
         )
 
         kirim_telegram(pesan)
-
         status_ref.set(True)
 
         print("Notifikasi terkirim:", nama, batas)
 
     elif not kondisi and sudah_dikirim:
-
         status_ref.set(False)
+        print("Status notifikasi direset:", nama, batas)
 
 
 # ==========================================
-# PEMERIKSAAN KEBOCORAN
+# CEK KEBOCORAN
 # ==========================================
 
 def cek_kebocoran(status):
 
     bocor = str(status).lower() in [
-        "true",
-        "1",
-        "yes",
-        "aktif"
+        "true", "1", "yes", "aktif"
     ]
 
     status_ref = db.reference(
@@ -189,12 +178,11 @@ def cek_kebocoran(status):
         )
 
         status_ref.set(True)
-
         print("Peringatan kebocoran terkirim.")
 
     elif not bocor and sudah_dikirim:
-
         status_ref.set(False)
+        print("Status kebocoran direset.")
 
 
 # ==========================================
@@ -206,17 +194,15 @@ def main():
     data = baca_data()
 
     print("================================")
-    print("MONITORING AGriWATER")
+    print("MONITORING AgriWater")
     print("Tanggal:", data["tanggal"])
     print("Harian:", data["harian"], "Liter")
     print("Bulanan:", data["bulanan"], "Liter")
     print("Kebocoran:", data["bocor"])
     print("================================")
 
-    # Pemeriksaan batas harian
-
+    # Batas harian
     for batas in BATAS_HARIAN:
-
         cek_dan_kirim(
             "pemakaian_harian",
             data["harian"],
@@ -224,10 +210,8 @@ def main():
             data["tanggal"]
         )
 
-    # Pemeriksaan batas bulanan
-
+    # Batas bulanan
     for batas in BATAS_BULANAN:
-
         cek_dan_kirim(
             "pemakaian_bulanan",
             data["bulanan"],
@@ -235,8 +219,7 @@ def main():
             data["bulan"]
         )
 
-    # Pemeriksaan kebocoran
-
+    # Peringatan kebocoran
     cek_kebocoran(data["bocor"])
 
 
