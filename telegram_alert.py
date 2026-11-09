@@ -1,3 +1,4 @@
+
 import os
 import json
 import requests
@@ -14,6 +15,7 @@ from firebase_admin import credentials, db
 
 FIREBASE_DATABASE_URL = os.environ["FIREBASE_DATABASE_URL"]
 FIREBASE_SERVICE_ACCOUNT = os.environ["FIREBASE_SERVICE_ACCOUNT"]
+
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 
@@ -126,7 +128,6 @@ def baca_data():
 
 def cek_dan_kirim(nama, nilai, batas, periode):
 
-    # Mengubah 4.5 menjadi 4_5 agar aman untuk Firebase
     batas_id = str(batas).replace(".", "_")
 
     status_ref = db.reference(
@@ -197,6 +198,12 @@ def cek_kebocoran(status):
 # ==========================================
 
 def main():
+
+    # TES PENGIRIMAN TELEGRAM
+    kirim_telegram(
+        "TES AgriWater:\n"
+        "Bot Telegram berhasil terhubung!"
+    )
 
     data = baca_data()
 
