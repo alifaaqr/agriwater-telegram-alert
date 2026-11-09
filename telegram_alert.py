@@ -126,8 +126,11 @@ def baca_data():
 
 def cek_dan_kirim(nama, nilai, batas, periode):
 
+    # Mengubah 4.5 menjadi 4_5 agar aman untuk Firebase
+    batas_id = str(batas).replace(".", "_")
+
     status_ref = db.reference(
-        f"AgriWater/TelegramAlertState/{periode}/{nama}_{batas}"
+        f"AgriWater/TelegramAlertState/{periode}/{nama}_{batas_id}"
     )
 
     sudah_dikirim = status_ref.get() or False
