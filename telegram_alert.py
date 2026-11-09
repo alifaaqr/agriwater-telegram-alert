@@ -46,7 +46,10 @@ if not firebase_admin._apps:
 
 def kirim_telegram(pesan):
 
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    url = (
+        f"https://api.telegram.org/"
+        f"bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    )
 
     response = requests.post(
         url,
@@ -99,7 +102,9 @@ def baca_data():
     ).get() or {}
 
     if monitoring is None:
-        raise ValueError("Data Monitoring tidak ditemukan.")
+        raise ValueError(
+            "Data Monitoring tidak ditemukan."
+        )
 
     pemakaian_harian = angka(
         riwayat_harian.get("pemakaianM3", 0)
@@ -128,10 +133,14 @@ def baca_data():
 
 def cek_dan_kirim(nama, nilai, batas, periode):
 
+    # Mengubah 4.5 menjadi 4_5
+    # agar aman digunakan sebagai nama path Firebase
+
     batas_id = str(batas).replace(".", "_")
 
     status_ref = db.reference(
-        f"AgriWater/TelegramAlertState/{periode}/{nama}_{batas_id}"
+        f"AgriWater/TelegramAlertState/"
+        f"{periode}/{nama}_{batas_id}"
     )
 
     sudah_dikirim = status_ref.get() or False
@@ -150,13 +159,21 @@ def cek_dan_kirim(nama, nilai, batas, periode):
 
         status_ref.set(True)
 
-        print("Notifikasi terkirim:", nama, batas)
+        print(
+            "Notifikasi terkirim:",
+            nama,
+            batas
+        )
 
     elif nilai < batas and sudah_dikirim:
 
         status_ref.set(False)
 
-        print("Status notifikasi direset:", nama, batas)
+        print(
+            "Status notifikasi direset:",
+            nama,
+            batas
+        )
 
 
 # ==========================================
@@ -166,7 +183,10 @@ def cek_dan_kirim(nama, nilai, batas, periode):
 def cek_kebocoran(status):
 
     bocor = str(status).lower() in [
-        "true", "1", "yes", "aktif"
+        "true",
+        "1",
+        "yes",
+        "aktif"
     ]
 
     status_ref = db.reference(
@@ -186,11 +206,17 @@ def cek_kebocoran(status):
 
         status_ref.set(True)
 
-        print("Peringatan kebocoran terkirim.")
+        print(
+            "Peringatan kebocoran terkirim."
+        )
 
     elif not bocor and sudah_dikirim:
 
         status_ref.set(False)
+
+        print(
+            "Status kebocoran direset."
+        )
 
 
 # ==========================================
@@ -199,11 +225,7 @@ def cek_kebocoran(status):
 
 def main():
 
-    # TES PENGIRIMAN TELEGRAM
-    kirim_telegram(
-        "TES AgriWater:\n"
-        "Bot Telegram berhasil terhubung!"
-    )
+    # MEMBACA DATA FIREBASE
 
     data = baca_data()
 
@@ -215,7 +237,10 @@ def main():
     print("Kebocoran:", data["bocor"])
     print("================================")
 
-    # BATAS HARIAN
+    # ======================================
+    # BATAS PEMAKAIAN HARIAN
+    # ======================================
+
     for batas in BATAS_HARIAN:
 
         cek_dan_kirim(
@@ -225,7 +250,10 @@ def main():
             data["tanggal"]
         )
 
-    # BATAS BULANAN
+    # ======================================
+    # BATAS PEMAKAIAN BULANAN
+    # ======================================
+
     for batas in BATAS_BULANAN:
 
         cek_dan_kirim(
@@ -235,9 +263,16 @@ def main():
             data["bulan"]
         )
 
-    # KEBOCORAN
+    # ======================================
+    # PERINGATAN KEBOCORAN
+    # ======================================
+
     cek_kebocoran(data["bocor"])
 
+
+# ==========================================
+# MENJALANKAN PROGRAM
+# ==========================================
 
 if __name__ == "__main__":
     main()
