@@ -225,6 +225,13 @@ def cek_kebocoran(status):
 
 def main():
 
+    # TES PENGIRIMAN TELEGRAM
+    kirim_telegram(
+        "TES NOTIFIKASI AGRIWATER\n\n"
+        "Telegram Bot berhasil mengirim pesan.\n"
+        "Integrasi GitHub Actions dengan Telegram berhasil diuji."
+    )
+
     # MEMBACA DATA FIREBASE
 
     data = baca_data()
